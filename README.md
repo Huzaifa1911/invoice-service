@@ -15,7 +15,7 @@
 ### 1. Install Dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 2. Environment Configuration
