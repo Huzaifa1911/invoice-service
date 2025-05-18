@@ -1,1 +1,1 @@
-export const GLOBAL_PREFIX = 'invoice/api';
+export const GLOBAL_PREFIX = 'invoice-app/api';

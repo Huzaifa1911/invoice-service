@@ -51,7 +51,65 @@
           "build"
         ],
         "command": "docker build -f apps/invoice-app/Dockerfile . -t invoice-app"
+      },
+      "db-up": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "dotenv -e .env -- docker-compose -f docker-compose.yml up -d",
+          "cwd": "apps/invoice-app"
+        }
+      },
+      "db-down": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "dotenv -e .env -- docker-compose -f docker-compose.yml down",
+          "cwd": "apps/invoice-app"
+        }
+      },
+      "db-reset": {
+        "dependsOn": [
+          "db-down",
+          "db-up",
+          "migrate"
+        ]
+      },
+      "init-migration": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "dotenv -e .env prisma migrate dev",
+          "cwd": "apps/invoice-app"
+        }
+      },
+      "migrate": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "dotenv -e .env npx prisma migrate deploy",
+          "cwd": "apps/invoice-app"
+        }
+      },
+      "prisma-generate": {
+        "dependsOn": [
+          "init-migration"
+        ],
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "dotenv -e .env npx prisma generate",
+          "cwd": "apps/invoice-app"
+        }
+      },
+      "prisma-studio": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "dotenv -e .env npx prisma studio",
+          "cwd": "apps/invoice-app"
+        }
       }
     }
+  },
+  "devDependencies": {
+    "prisma": "^6.8.2"
+  },
+  "dependencies": {
+    "@prisma/client": "6.8.2"
   }
 }

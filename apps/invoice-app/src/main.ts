@@ -28,10 +28,10 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document, { useGlobalPrefix: true });
+  SwaggerModule.setup(`${GLOBAL_PREFIX}/docs`, app, document);
 
   // Enable CORS for development environment
-  if (process.env?.CONFIGURATION === 'development') {
+  if (process.env?.NODE_ENV === 'development') {
     app.enableCors({
       origin: '*',
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Allowed HTTP methods
