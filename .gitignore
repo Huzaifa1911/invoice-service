@@ -42,4 +42,5 @@ Thumbs.db
 .nx/workspace-data
 
 test-output
+apps/invoice-app/.env
 apps/invoice-app/generated/prisma
