@@ -26,7 +26,8 @@
         "executor": "@nx/js:node",
         "defaultConfiguration": "development",
         "dependsOn": [
-          "build"
+          "build",
+          "db-up"
         ],
         "options": {
           "buildTarget": "invoice-app:build",

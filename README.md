@@ -61,37 +61,21 @@ DATABASE_URL="postgresql://root:root@localhost:5432/invoice_app?schema=public"
 
 ## 🔧 Commands Reference
 
-| Command                                | Description                                     |
-| -------------------------------------- | ----------------------------------------------- |
-| `nx serve invoice-app`                 | Start the app in development mode               |
-| `nx build invoice-app`                 | Build app for production                        |
-| `nx run invoice-app:build:development` | Build in development mode                       |
-| `nx run invoice-app:build:production`  | Build in production mode                        |
-| `nx test invoice-app`                  | Run all tests                                   |
-| `nx run invoice-app:docker-build`      | Build Docker image using app’s Dockerfile       |
-| `nx run invoice-app:db-up`             | Start PostgreSQL and PGAdmin via Docker Compose |
-| `nx run invoice-app:db-down`           | Stop and remove DB containers                   |
-| `nx run invoice-app:db-reset`          | Full DB reset (stop → start → migrate)          |
-| `nx run invoice-app:init-migration`    | Create a new migration using Prisma             |
-| `nx run invoice-app:migrate`           | Deploy existing migrations                      |
-| `nx run invoice-app:prisma-generate`   | Generate Prisma client                          |
-| `nx run invoice-app:prisma-studio`     | Open Prisma Studio UI                           |
-
----
-
-## 🐳 Docker Usage
-
-### Build Docker Image
-
-```bash
-nx run invoice-app:docker-build
-```
-
-### Run the Container Manually
-
-```bash
-docker run -p 8000:8000 --env-file ./apps/invoice-app/.env invoice-app
-```
+| Command                                | Description                               |
+| -------------------------------------- | ----------------------------------------- |
+| `nx serve invoice-app`                 | Start the app in development mode         |
+| `nx build invoice-app`                 | Build app for production                  |
+| `nx run invoice-app:build:development` | Build in development mode                 |
+| `nx run invoice-app:build:production`  | Build in production mode                  |
+| `nx test invoice-app`                  | Run all tests                             |
+| `nx run invoice-app:docker-build`      | Build Docker image using app’s Dockerfile |
+| `nx run invoice-app:db-up`             | Start PostgreSQL via Docker Compose       |
+| `nx run invoice-app:db-down`           | Stop and remove DB containers             |
+| `nx run invoice-app:db-reset`          | Full DB reset (stop → start → migrate)    |
+| `nx run invoice-app:init-migration`    | Create a new migration using Prisma       |
+| `nx run invoice-app:migrate`           | Deploy existing migrations                |
+| `nx run invoice-app:prisma-generate`   | Generate Prisma client                    |
+| `nx run invoice-app:prisma-studio`     | Open Prisma Studio UI                     |
 
 ---
 
