@@ -57,6 +57,11 @@ PGADMIN_DEFAULT_PASSWORD=admin
 DATABASE_URL="postgresql://root:root@localhost:5432/invoice_app?schema=public"
 ```
 
+### 3. Start application
+
+```bash
+npx nx run invoice-app:serve
+```
 ---
 
 ## 🔧 Commands Reference
