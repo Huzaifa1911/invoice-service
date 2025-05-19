@@ -3,7 +3,7 @@
  * This is only a minimal backend to get started.
  */
 
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -18,7 +18,10 @@ async function bootstrap() {
     logger: new AppLogger('app-root'),
   });
 
-  app.setGlobalPrefix(GLOBAL_PREFIX).useGlobalFilters(new AppExceptionFilter());
+  app
+    .setGlobalPrefix(GLOBAL_PREFIX)
+    .useGlobalFilters(new AppExceptionFilter())
+    .useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
 
   // Enable Swagger documentation
   const config = new DocumentBuilder()

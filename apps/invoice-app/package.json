@@ -98,6 +98,16 @@
           "cwd": "apps/invoice-app"
         }
       },
+      "prisma-seed": {
+        "dependsOn": [
+          "init-migration"
+        ],
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "dotenv -e .env npx prisma db seed",
+          "cwd": "apps/invoice-app"
+        }
+      },
       "prisma-studio": {
         "executor": "nx:run-commands",
         "options": {
@@ -112,5 +122,8 @@
   },
   "dependencies": {
     "@prisma/client": "6.8.2"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seeds/seed.ts"
   }
 }
