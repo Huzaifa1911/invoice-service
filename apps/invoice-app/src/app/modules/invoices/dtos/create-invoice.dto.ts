@@ -26,15 +26,6 @@ export class CreateInvoiceDto {
   @IsNotEmpty()
   customer!: string;
 
-  @ApiProperty({ example: 1500.75 })
-  @IsNumber()
-  amount!: number;
-
-  @ApiProperty({ example: 'INV-2024-001' })
-  @IsString()
-  @IsNotEmpty()
-  reference!: string;
-
   @ApiProperty({ example: '2025-05-19T12:00:00Z' })
   @IsDateString()
   date!: string;

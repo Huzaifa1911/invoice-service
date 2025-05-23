@@ -9,6 +9,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppLogger } from '../../logger/logger';
 import { CreateInvoiceDto } from './dtos/create-invoice.dto';
 import { getPaginationParams } from '../../utils';
+import { Invoice } from '../../../../generated/prisma';
+import { RequestScopeType } from '../../types';
 
 @Injectable()
 /**
@@ -22,31 +24,29 @@ export class InvoiceService {
 
   /**
    * Retrieves a paginated and optionally filtered list of invoices.
+   * Admins can see all invoices. Users only see their own.
    *
-   * @param userId - (Optional) ID of the user whose invoices to fetch.
-   * @param page - (Optional) Page number for pagination (default: 1).
-   * @param limit - (Optional) Number of records per page (default: 10).
-   * @param startDate - (Optional) Start date (inclusive) to filter invoices by creation time (ISO 8601 format).
-   * @param endDate - (Optional) End date (inclusive) to filter invoices by creation time (ISO 8601 format).
-   * @returns An object containing:
-   *   - `data`: The list of flattened invoice records.
-   *   - `meta`: Pagination metadata including total, currentPage, nextPage, and totalPages.
-   * @throws InternalServerErrorException if the fetch fails.
+   * @param page - Page number (default: 1)
+   * @param limit - Number of records per page (default: 10)
+   * @param startDate - Optional start date filter (ISO string)
+   * @param endDate - Optional end date filter (ISO string)
+   * @param requestScopeFilter - Optional role-based filter (e.g. { userId })
+   * @returns A paginated response with invoice data and metadata
+   * @throws InternalServerErrorException if retrieval fails
    */
   async getInvoices(
-    userId?: string,
     page = 1,
     limit = 10,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    requestScopeFilter?: RequestScopeType
   ) {
     try {
-      this.logger.log(`Fetching invoices for user ID: ${userId}`);
+      this.logger.log(`Fetching invoices from db`);
       const { skip, take } = getPaginationParams(page, limit);
 
-      const whereClause: any = {};
+      const whereClause = { ...requestScopeFilter };
 
-      if (userId) whereClause.userId = userId;
       if (startDate || endDate) {
         whereClause.date = {};
         if (startDate) whereClause.date.gte = new Date(startDate);
@@ -84,19 +84,20 @@ export class InvoiceService {
   }
 
   /**
-   * Retrieves a single invoice by its ID and (optionally) the user ID.
+   * Retrieves a single invoice by its ID.
+   * Users can only access their own invoices. Admins can access all.
    *
-   * @param id - ID of the invoice to retrieve.
-   * @param userId - (Optional) ID of the user to validate ownership.
-   * @returns The invoice object if found.
-   * @throws NotFoundException if the invoice is not found.
-   * @throws InternalServerErrorException if an unknown error occurs.
+   * @param id - ID of the invoice
+   * @param requestScopeFilter - Optional scope filter (e.g. { userId })
+   * @returns The matched invoice with user and item details
+   * @throws NotFoundException if invoice is not found
+   * @throws InternalServerErrorException if retrieval fails
    */
-  async getInvoiceById(id: string, userId?: string) {
+  async getInvoiceById(id: string, requestScopeFilter?: RequestScopeType) {
     try {
       this.logger.log(`Fetching invoice with ID: ${id}`);
       const invoice = await this.prisma.invoice.findUnique({
-        where: { id, userId },
+        where: { id, ...requestScopeFilter },
         include: { items: true, user: true },
       });
 
@@ -119,90 +120,102 @@ export class InvoiceService {
   }
 
   /**
-   * Creates a new invoice and updates the item stock accordingly.
-   * Performs validation to ensure sufficient stock is available for each item.
-   * All operations are executed inside a single transaction.
+   * Creates a new invoice and updates item stock accordingly.
+   * Performs validation to ensure item existence and sufficient stock.
+   * Reference format: INV-YYYYMM-XXXX
    *
-   * @param payload - The invoice creation payload including items and meta info.
-   * @param userId - The ID of the user creating the invoice.
-   * @returns The newly created invoice object.
-   * @throws BadRequestException if userId is missing or stock is insufficient.
-   * @throws InternalServerErrorException if invoice creation fails.
+   * @param payload - CreateInvoiceDto containing customer and items
+   * @param userId - ID of the user creating the invoice
+   * @returns The newly created invoice
+   * @throws BadRequestException if stock is insufficient or items are missing
+   * @throws InternalServerErrorException if invoice creation fails
    */
-  async createInvoice(payload: CreateInvoiceDto, userId: string): Promise<any> {
-    try {
-      this.logger.log(`Creating invoice for user ID: ${userId}`);
+  async createInvoice(
+    payload: CreateInvoiceDto,
+    userId: string
+  ): Promise<Invoice> {
+    const { customer, items } = payload;
 
-      if (!userId) {
-        this.logger.error('User ID is required to create an invoice');
-        throw new BadRequestException('User ID is required');
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Validate items and stock
+      const itemIds = items.map((i) => i.itemId);
+      const dbItems = await tx.item.findMany({
+        where: { id: { in: itemIds } },
+      });
+
+      const itemMap = new Map(dbItems.map((item) => [item.id, item]));
+      let totalAmount = 0;
+
+      for (const { itemId, quantity } of items) {
+        const dbItem = itemMap.get(itemId);
+        if (!dbItem) {
+          throw new BadRequestException(`Item ID ${itemId} not found`);
+        }
+        if ((dbItem.quantity ?? 0) < quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for item '${dbItem.name}'. Requested: ${quantity}, Available: ${dbItem.quantity}`
+          );
+        }
+
+        totalAmount += (dbItem.sale_price ?? 0) * quantity;
       }
 
-      const { items: invoiceItems, ...invoice } = payload;
+      // 2. Generate unique reference
+      const now = new Date();
+      const monthStr = `${now.getFullYear()}${(now.getMonth() + 1)
+        .toString()
+        .padStart(2, '0')}`;
+      const invoiceCount = await tx.invoice.count();
+      const reference = `INV-${monthStr}-${(invoiceCount + 1)
+        .toString()
+        .padStart(4, '0')}`;
 
-      return await this.prisma.$transaction(async (tx) => {
-        const itemIds = invoiceItems.map((item) => item.itemId);
-        const itemsInDb = await tx.item.findMany({
-          where: { id: { in: itemIds } },
-        });
-
-        const itemStockMap = new Map(
-          itemsInDb.map((item) => [item.id, item.quantity])
-        );
-
-        for (const item of invoiceItems) {
-          const stock = itemStockMap.get(item.itemId);
-          if (stock === undefined) {
-            throw new BadRequestException(`Item ID ${item.itemId} not found.`);
-          }
-          if (item.quantity > stock) {
-            throw new BadRequestException(
-              `Insufficient stock for item ID ${item.itemId}. Requested: ${item.quantity}, Available: ${stock}`
-            );
-          }
-        }
-
-        const createdInvoice = await tx.invoice.create({
-          data: {
-            ...invoice,
-            userId,
-            items: {
-              create: invoiceItems.map((item) => ({
-                itemId: item.itemId,
-                quantity: item.quantity,
-              })),
+      // 3. Create invoice
+      const invoice = await tx.invoice.create({
+        data: {
+          customer,
+          reference,
+          amount: Math.round(totalAmount * 100) / 100,
+          date: now,
+          userId,
+          items: {
+            createMany: {
+              data: items.map(({ itemId, quantity }) => ({ itemId, quantity })),
             },
           },
-          include: { items: true, user: { omit: { password: true } } },
-        });
+        },
+      });
 
-        for (const item of invoiceItems) {
-          await tx.item.update({
-            where: { id: item.itemId },
+      // 4. Update stock using updateMany (if supported per itemId)
+      await Promise.all(
+        items.map(({ itemId, quantity }) =>
+          tx.item.update({
+            where: { id: itemId },
             data: {
               quantity: {
-                decrement: item.quantity,
+                decrement: quantity,
               },
             },
-          });
-        }
-
-        this.logger.log(
-          `Invoice created successfully with ID: ${createdInvoice.id}`
-        );
-        return createdInvoice;
-      });
-    } catch (error: any) {
-      this.logger.error(
-        `Error creating invoice for user ID ${userId}. Please see the server logs`,
-        error
+          })
+        )
       );
 
-      if (error instanceof BadRequestException) throw error;
+      return invoice;
+    });
+  }
 
-      throw new InternalServerErrorException(
-        'Failed to create invoice. Please check the server logs for more details.'
-      );
+  async generateDailyReport(
+    startDate?: string,
+    endDate?: string
+  ): Promise<Buffer> {
+    const whereClause: any = {};
+
+    if (startDate || endDate) {
+      whereClause.date = {};
+      if (startDate) whereClause.date.gte = new Date(startDate);
+      if (endDate) whereClause.date.lte = new Date(endDate);
     }
+
+    return Buffer.from('dummy report');
   }
 }

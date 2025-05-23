@@ -1,12 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
+import { Role } from '../../../../../generated/prisma';
 
 export class LoginDTO {
   @IsEmail()
@@ -38,8 +39,13 @@ export class signupDTO {
   @ApiProperty()
   password!: string;
 
-  @IsBoolean()
   @IsOptional()
-  @ApiProperty()
-  is_super?: boolean;
+  @IsEnum(Role, {
+    message: `Role must be one of: ${Object.values(Role).join(', ')}`,
+  })
+  @ApiPropertyOptional({
+    enum: Role,
+    description: 'Optional role assignment (USER or ADMIN)',
+  })
+  role?: Role;
 }

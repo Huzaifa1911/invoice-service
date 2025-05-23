@@ -1,16 +1,36 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
+import { ApiParam, ApiQuery } from '@nestjs/swagger';
 
 import { InvoiceService } from './invoice.services';
 import { CreateInvoiceDto } from './dtos/create-invoice.dto';
-import { UserInfo } from '../../decorators/user.decorator';
-import { ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  Roles,
+  RequestScope,
+  UserInfo,
+} from '../../decorators/common.decorator';
 
+import { JwtAuthGuard } from '../../guards/auth.guard';
+import type { RequestScopeType } from '../../types';
+import { RolesGuard } from '../../guards/roles.guard';
+import { Role } from '../../../../generated/prisma';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('invoices')
 export class InvoiceController {
   constructor(private readonly invoiceService: InvoiceService) {}
 
   @Get('/')
+  @Roles(Role.ADMIN, Role.USER)
   @ApiQuery({
     name: 'page',
     required: false,
@@ -40,7 +60,7 @@ export class InvoiceController {
     example: '2024-12-31',
   })
   async getInvoices(
-    @UserInfo('id') userId: string,
+    @RequestScope() requestScope: RequestScopeType,
     @Res() res: Response,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
@@ -48,11 +68,11 @@ export class InvoiceController {
     @Query('endDate') endDate?: string
   ) {
     const invoices = await this.invoiceService.getInvoices(
-      userId,
       page,
       limit,
       startDate,
-      endDate
+      endDate,
+      requestScope
     );
     res.status(200).send({
       message: 'Invoices fetched successfully',
@@ -61,6 +81,7 @@ export class InvoiceController {
   }
 
   @Get('/:id')
+  @Roles('ADMIN', 'USER')
   @ApiParam({
     name: 'id',
     required: true,
@@ -70,10 +91,10 @@ export class InvoiceController {
   })
   async getInvoiceById(
     @Param('id') id: string,
-    @UserInfo('id') userId: string,
+    @RequestScope() requestScope: RequestScopeType,
     @Res() res: Response
   ) {
-    const invoice = await this.invoiceService.getInvoiceById(id, userId);
+    const invoice = await this.invoiceService.getInvoiceById(id, requestScope);
 
     res.status(200).send({
       message: 'Invoice fetched successfully',
@@ -82,6 +103,7 @@ export class InvoiceController {
   }
 
   @Post('/')
+  @Roles(Role.ADMIN, Role.USER)
   async createInvoice(
     @Body() invoice: CreateInvoiceDto,
     @UserInfo('id') userId: string,
@@ -95,6 +117,38 @@ export class InvoiceController {
     res.status(201).send({
       message: 'Invoice created successfully',
       data: createdInvoice,
+    });
+  }
+
+  @Roles(Role.ADMIN)
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Start date for filtering invoices',
+    type: String,
+    example: '2024-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'End date for filtering invoices',
+    type: String,
+    example: '2024-12-31',
+  })
+  @Get('/report')
+  async getSalesReport(
+    @RequestScope() requestScope: RequestScopeType,
+    @Res() res: Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    const report = await this.invoiceService.generateDailyReport(
+      startDate,
+      endDate
+    );
+    res.status(200).send({
+      message: 'Sales report fetched successfully',
+      data: report,
     });
   }
 }
