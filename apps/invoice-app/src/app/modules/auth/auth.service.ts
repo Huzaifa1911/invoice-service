@@ -1,27 +1,78 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+
 import { PrismaService } from '../prisma/prisma.service';
+import { LoginDTO, signupDTO } from './dto/auth.dto';
+
+export const roundsOfHashing = 10;
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private prismaService: PrismaService,
+    private jwtService: JwtService
+  ) {}
 
-  async login() {
-    // Implement your login logic here
+  validateToken(token: string) {
+    return this.jwtService.verify(token, {
+      secret: process.env.JWT_SECRET_KEY,
+    });
+  }
+
+  async login({ email, password }: LoginDTO) {
+    const user = await this.prismaService.user.findUnique({
+      where: { email: email },
+    });
+
+    // If no user is found, throw an error
+    if (!user) {
+      throw new NotFoundException(`User not found for email: ${email}`);
+    }
+
+    // Step 2: Check if the password is correct
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    // // If password does not match, throw an error
+    if (!isPasswordValid) {
+      throw new UnauthorizedException(`Invalid password for email: ${email}`);
+    }
+
+    // Step 3: Generate a JWT token
     return {
-      message: 'Login successful',
+      user,
+      accessToken: this.jwtService.sign({ email: user.email, id: user.id }),
     };
   }
 
-  async register() {
-    // Implement your registration logic here
-    //!TODO:  remove below code
-    const user = await this.prismaService.user.findMany({
-      where: { is_active: true },
+  async register({ email, password, full_name, is_super = false }: signupDTO) {
+    const user = await this.prismaService.user.findUnique({
+      where: { email },
     });
 
-    return {
-      message: 'Registration successful',
-      users: user,
-    };
+    if (user) {
+      throw new ConflictException(`User with email ${email} already exists`);
+    } else {
+      const hashedPassword = await bcrypt.hash(password, roundsOfHashing);
+      const user = await this.prismaService.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          full_name,
+          is_super,
+        },
+      });
+
+      return {
+        message: 'Registration successful',
+        user,
+        accessToken: this.jwtService.sign({ email: user.email, id: user.id }),
+      };
+    }
   }
 }
