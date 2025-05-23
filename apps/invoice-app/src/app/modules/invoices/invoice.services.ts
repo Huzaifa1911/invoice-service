@@ -101,9 +101,7 @@ export class InvoiceService {
       });
 
       if (!invoice) {
-        this.logger.warn(
-          `Invoice with ID ${id} against user with ID ${userId} not found`
-        );
+        this.logger.warn(`Invoice with ID ${id} not found`);
         throw new NotFoundException(`Invoice with ID ${id} not found`);
       }
 
