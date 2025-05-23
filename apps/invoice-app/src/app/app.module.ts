@@ -2,10 +2,15 @@ import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { AppLoggingMiddleware } from './middlewares/logger.middleware';
-import { AuthModule, PrismaModule } from './modules';
+import { AuthModule, InvoiceModule, PrismaModule } from './modules';
 
 @Module({
-  imports: [PrismaModule, ConfigModule.forRoot({ isGlobal: true }), AuthModule],
+  imports: [
+    PrismaModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    AuthModule,
+    InvoiceModule,
+  ],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer): void {

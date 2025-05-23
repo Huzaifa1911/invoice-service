@@ -32,25 +32,35 @@ model Invoice {
   id         String        @id @default(uuid())
   customer   String
   amount     Float
-  reference  String
+  reference  String        @unique
   date       DateTime
   items      InvoiceItem[]
   userId     String
   user       User          @relation(fields: [userId], references: [id])
   createdAt  DateTime      @default(now())
   updated_at DateTime      @updatedAt
+
+  @@index([userId], name: "idx_invoices_user_id")
 }
 
 model InvoiceItem {
-  id         String   @id @default(uuid())
-  name       String
-  sku        String   @unique
-  quantity   Int
-  unit_price Float
-  invoiceId  String
-  invoice    Invoice  @relation(fields: [invoiceId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(uuid())
+  Invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  invoiceId String?
+  Item      Item?    @relation(fields: [itemId], references: [id])
+  itemId    String?
+  quantity  Int
+}
+
+model Item {
+  id          String        @id @default(uuid())
+  name        String
+  sku         String        @unique
+  quantity    Int
+  unit_price  Float
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  InvoiceItem InvoiceItem[]
 
   @@index([sku], name: "idx_invoice_items_sku")
   @@map("invoice_items")

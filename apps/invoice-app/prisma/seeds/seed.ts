@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../generated/prisma';
+import { PrismaClient, User, Item } from '../../generated/prisma';
 import * as bcrypt from 'bcrypt';
 import { faker } from '@faker-js/faker';
 
@@ -9,6 +9,18 @@ const INVOICES_PER_USER = 10;
 const MIN_ITEMS = 2;
 const MAX_ITEMS = 5;
 
+type SeedItemInput = {
+  name: string;
+  sku: string;
+  quantity: number;
+  unit_price: number;
+};
+
+type InvoiceItemInput = {
+  itemId: string;
+  quantity: number;
+};
+
 function getRandomDateWithinLastDays(days: number): Date {
   const now = new Date();
   const past = new Date(now);
@@ -16,31 +28,33 @@ function getRandomDateWithinLastDays(days: number): Date {
   return past;
 }
 
-function generateFakeItems(min: number, max: number) {
+function generateFakeItems(min: number, max: number): SeedItemInput[] {
   const count = faker.number.int({ min, max });
-  const items: any[] = [];
+  const items: SeedItemInput[] = [];
 
   for (let i = 0; i < count; i++) {
-    const name = faker.commerce.productName();
-    const sku = `${faker.string
-      .alphanumeric(5)
-      .toUpperCase()}-${faker.number.int({ min: 1000, max: 9999 })}`;
-    const quantity = faker.number.int({ min: 1, max: 10 });
-    const unit_price = parseFloat(
-      faker.commerce.price({ min: 100, max: 1000 })
-    );
-
-    items.push({ name, sku, quantity, unit_price });
+    items.push({
+      name: faker.commerce.productName(),
+      sku: `${faker.string.alphanumeric(5).toUpperCase()}-${faker.number.int({
+        min: 1000,
+        max: 9999,
+      })}`,
+      quantity: faker.number.int({ min: 5, max: 50 }), // stock quantity
+      unit_price: parseFloat(faker.commerce.price({ min: 100, max: 1000 })),
+    });
   }
 
   return items;
 }
 
-async function main() {
-  console.log('🌱 Seeding with Faker + prices...');
+async function main(): Promise<void> {
+  console.log('🌱 Seeding users, items, and invoices...');
 
-  const password = await bcrypt.hash('Password@123', 10);
+  const passwordHash: string = await bcrypt.hash('Password@123', 10);
 
+  const users: User[] = [];
+
+  // Create users
   for (let u = 0; u < NUM_USERS; u++) {
     const isSuper = u === 0;
     const fullName = isSuper ? 'Admin User' : faker.person.fullName();
@@ -48,38 +62,59 @@ async function main() {
       ? 'admin@example.com'
       : faker.internet.email({ firstName: fullName.split(' ')[0] });
 
-    const user = await prisma.user.create({
-      data: {
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
         full_name: fullName,
         email,
-        password,
+        password: passwordHash,
         is_super: isSuper,
         is_active: true,
       },
     });
 
+    users.push(user);
+  }
+
+  // Create global catalog items
+  const itemInputs: SeedItemInput[] = generateFakeItems(15, 20);
+  const catalogItems: Item[] = await Promise.all(
+    itemInputs.map((item) => prisma.item.create({ data: item }))
+  );
+
+  // Create invoices for each user
+  for (const user of users) {
     for (let i = 0; i < INVOICES_PER_USER; i++) {
-      const items = generateFakeItems(MIN_ITEMS, MAX_ITEMS);
-      const amount = items.reduce(
-        (total, item) => total + item.unit_price * item.quantity,
-        0
+      const selectedItems = faker.helpers.arrayElements(
+        catalogItems,
+        faker.number.int({ min: MIN_ITEMS, max: MAX_ITEMS })
       );
+
+      const invoiceItems: InvoiceItemInput[] = [];
+      let totalAmount = 0;
+
+      for (const item of selectedItems) {
+        const quantity = faker.number.int({ min: 1, max: 5 });
+        invoiceItems.push({ itemId: item.id, quantity });
+        totalAmount += item.unit_price * quantity;
+      }
 
       const invoice = await prisma.invoice.create({
         data: {
           customer: faker.company.name(),
-          reference: `INV-${u + 1}-${i + 1}-${Date.now()}`,
+          reference: `INV-${user.id.slice(0, 5)}-${i + 1}-${Date.now()}`,
           date: getRandomDateWithinLastDays(7),
-          amount: Math.round(amount * 100) / 100, // Round to 2 decimal places
+          amount: Math.round(totalAmount * 100) / 100,
           userId: user.id,
           items: {
-            create: items,
+            create: invoiceItems,
           },
         },
       });
 
       console.log(
-        `🧾 Created invoice ${invoice.reference} | Amount: ${invoice.amount}`
+        `🧾 Created invoice ${invoice.reference} | Total: ${invoice.amount}`
       );
     }
   }
@@ -89,8 +124,8 @@ async function main() {
 
 main()
   .then(() => prisma.$disconnect())
-  .catch((e) => {
-    console.error('❌ Seed error:', e);
+  .catch((error: unknown) => {
+    console.error('❌ Seed error:', error);
     prisma.$disconnect();
     process.exit(1);
   });
