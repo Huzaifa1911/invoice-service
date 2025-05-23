@@ -1,35 +1,30 @@
 import {
   ExecutionContext,
-  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Observable } from 'rxjs';
 
-import { AuthService } from '../modules/auth/auth.service';
+import { AppLogger } from '../logger/logger';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private readonly authService: AuthService) {
-    super();
+  private readonly logger = new AppLogger(JwtAuthGuard.name);
+
+  override canActivate(
+    context: ExecutionContext
+  ): boolean | Promise<boolean> | Observable<boolean> {
+    return super.canActivate(context); // allow Passport strategy to run
   }
 
-  override async canActivate(context: ExecutionContext) {
-    try {
-      const request = context.switchToHttp().getRequest();
-      const { authorization }: any = request.headers;
-      if (!authorization || authorization.trim() === '') {
-        throw new UnauthorizedException('Please provide token');
-      }
-      const authToken = authorization.replace(/bearer/gim, '').trim();
-      const resp = await this.authService.validateToken(authToken);
-      request.decodedData = resp;
-      return true;
-    } catch (error: any) {
-      console.log('auth error - ', error?.message);
-      throw new ForbiddenException(
-        error?.message || 'session expired! Please sign In'
-      );
+  override handleRequest(err: any, user: any, info: any) {
+    if (err || !user) {
+      this.logger.error('Unauthorized access attempt', err);
+      throw err || new UnauthorizedException('Invalid token');
     }
+
+    this.logger.log(`User authenticated: ${user}`);
+    return user;
   }
 }

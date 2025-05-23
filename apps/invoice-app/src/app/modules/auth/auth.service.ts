@@ -19,12 +19,6 @@ export class AuthService {
     private jwtService: JwtService
   ) {}
 
-  validateToken(token: string) {
-    return this.jwtService.verify(token, {
-      secret: process.env.JWT_SECRET_KEY,
-    });
-  }
-
   async login({ email, password }: LoginDTO) {
     const user = await this.prismaService.user.findUnique({
       where: { email: email },
@@ -46,11 +40,15 @@ export class AuthService {
     // Step 3: Generate a JWT token
     return {
       user,
-      accessToken: this.jwtService.sign({ email: user.email, id: user.id }),
+      accessToken: this.jwtService.sign({
+        email: user.email,
+        id: user.id,
+        role: user.role,
+      }),
     };
   }
 
-  async register({ email, password, full_name, is_super = false }: signupDTO) {
+  async register({ email, password, full_name, role = 'USER' }: signupDTO) {
     const user = await this.prismaService.user.findUnique({
       where: { email },
     });
@@ -64,14 +62,18 @@ export class AuthService {
           email,
           password: hashedPassword,
           full_name,
-          is_super,
+          role,
         },
       });
 
       return {
         message: 'Registration successful',
         user,
-        accessToken: this.jwtService.sign({ email: user.email, id: user.id }),
+        accessToken: this.jwtService.sign({
+          email: user.email,
+          id: user.id,
+          role: user.role,
+        }),
       };
     }
   }

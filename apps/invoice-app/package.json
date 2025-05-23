@@ -56,7 +56,7 @@
       "db-up": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "dotenv -e .env -- docker-compose -f docker-compose.yml up -d",
+          "command": "dotenv -e .env -- docker-compose -f docker-compose.yml up -d && sleep 5",
           "cwd": "apps/invoice-app"
         }
       },
@@ -118,10 +118,13 @@
     }
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "prisma": "^6.8.2"
   },
   "dependencies": {
-    "@prisma/client": "6.8.2"
+    "@nestjs/schedule": "^6.0.0",
+    "@prisma/client": "6.8.2",
+    "amqplib": "^0.10.8"
   },
   "prisma": {
     "seed": "ts-node prisma/seeds/seed.ts"
