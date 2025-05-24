@@ -47,5 +47,8 @@ export class signupDTO {
     enum: Role,
     description: 'Optional role assignment (USER or ADMIN)',
   })
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  @ApiPropertyOptional({ enum: Role, default: Role.USER })
   role?: Role;
 }

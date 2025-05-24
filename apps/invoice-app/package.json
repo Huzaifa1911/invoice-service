@@ -122,9 +122,12 @@
     "prisma": "^6.8.2"
   },
   "dependencies": {
+    "@nestjs-modules/mailer": "^2.0.2",
+    "@nestjs/mapped-types": "*",
     "@nestjs/schedule": "^6.0.0",
     "@prisma/client": "6.8.2",
-    "amqplib": "^0.10.8"
+    "amqplib": "^0.10.8",
+    "nodemailer": "^7.0.3"
   },
   "prisma": {
     "seed": "ts-node prisma/seeds/seed.ts"

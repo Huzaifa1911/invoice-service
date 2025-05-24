@@ -9,6 +9,7 @@ import {
   PrismaModule,
   RabbitMQModule,
   SalesReportJob,
+  EmailModule,
 } from './modules';
 
 @Module({
@@ -19,6 +20,7 @@ import {
     InvoiceModule,
     ScheduleModule.forRoot(),
     RabbitMQModule,
+    EmailModule,
   ],
   providers: [SalesReportJob],
 })

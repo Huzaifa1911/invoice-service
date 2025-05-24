@@ -22,15 +22,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    
+
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - '5673:5673'
+      - '15673:15673'
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+
+  mailhog:
+    image: mailhog/mailhog
+    restart: always
+    ports:
+      - '1025:1025' # SMTP
+      - '8025:8025' # Web UI
 
   # pgadmin:
   #   container_name: pgadmin
