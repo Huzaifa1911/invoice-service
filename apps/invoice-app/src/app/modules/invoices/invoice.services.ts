@@ -4,13 +4,23 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { endOfDay, startOfDay } from 'date-fns';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AppLogger } from '../../logger/logger';
 import { CreateInvoiceDto } from './dtos/create-invoice.dto';
-import { getPaginationParams } from '../../utils';
+import {
+  generateSalesReportPDF,
+  getPaginationParams,
+  sanitizeSalesReportFileName,
+} from '../../utils';
 import { Invoice } from '../../../../generated/prisma';
-import { RequestScopeType } from '../../types';
+import {
+  ExportAttachment,
+  RequestScopeType,
+  SalesReportItem,
+  SalesReportMeta,
+} from '../../types';
 
 @Injectable()
 /**
@@ -204,18 +214,108 @@ export class InvoiceService {
     });
   }
 
-  async generateDailyReport(
+  /**
+   * Generates a sales report for a given date range (or for today if no range is provided).
+   * It calculates total revenue and profit per item and returns a PDF buffer.
+   *
+   * @param startDate - Optional ISO date string (inclusive).
+   * @param endDate - Optional ISO date string (inclusive).
+   * @returns A Buffer containing the generated PDF report.
+   */
+  async generateSalesReport(
     startDate?: string,
     endDate?: string
-  ): Promise<Buffer> {
-    const whereClause: any = {};
+  ): Promise<ExportAttachment> {
+    try {
+      this.logger.log(
+        `Generating sales report from ${startDate} to ${endDate}`
+      );
 
-    if (startDate || endDate) {
-      whereClause.date = {};
-      if (startDate) whereClause.date.gte = new Date(startDate);
-      if (endDate) whereClause.date.lte = new Date(endDate);
+      const whereClause: { date?: { gte?: Date; lte?: Date } } = {};
+      if (startDate || endDate) {
+        this.logger.log(
+          `Generating sales report from ${startDate} to ${endDate}`
+        );
+        whereClause.date = {};
+        if (startDate) whereClause.date.gte = startOfDay(new Date(startDate));
+        if (endDate) whereClause.date.lte = endOfDay(new Date(endDate));
+      } else {
+        this.logger.log(`Generating sales report`);
+      }
+
+      // Fetch all invoice items for the date range, including related product data
+      const invoiceItems = await this.prisma.invoiceItem.findMany({
+        where: { Invoice: whereClause },
+        include: { Item: true },
+      });
+
+      // Initialize total counters and map for grouped item stats
+      let totalSalesAmount = 0;
+      let totalProfit = 0;
+      const itemSalesMap = new Map<string, SalesReportItem>();
+
+      // Flattened loop — processes each invoice item only once
+      for (const { quantity, Item } of invoiceItems) {
+        if (!Item) continue;
+
+        // Compute revenue and profit for this item line
+        const revenue = Number(Item.sale_price) * quantity;
+        const profit =
+          (Number(Item.sale_price) - Number(Item.unit_price)) * quantity;
+
+        // Accumulate global totals
+        totalSalesAmount += revenue;
+        totalProfit += profit;
+
+        // Group by SKU and accumulate per-item metrics
+        if (!itemSalesMap.has(Item.sku)) {
+          itemSalesMap.set(Item.sku, {
+            sku: Item.sku,
+            name: Item.name,
+            quantity: 0,
+            revenue: 0,
+            profit: 0,
+          });
+        }
+
+        const entry = itemSalesMap.get(Item.sku);
+        if (!entry) continue; // Safety check
+        entry.quantity += quantity;
+        entry.revenue += revenue;
+        entry.profit += profit;
+      }
+
+      // If no items were found, throw an error
+      if (itemSalesMap.size === 0) {
+        throw new NotFoundException(
+          'No sales data found for the specified range'
+        );
+      }
+
+      // Structure the final report metadata
+      const report: SalesReportMeta = {
+        date: new Date().toISOString(),
+        amount: totalSalesAmount,
+        profit: totalProfit,
+        items: Array.from(itemSalesMap.values()),
+      };
+
+      // Generate and return the PDF buffer
+      const attachment = await generateSalesReportPDF(report);
+
+      return {
+        attachment,
+        filename: sanitizeSalesReportFileName(whereClause),
+      };
+    } catch (error: any) {
+      this.logger.error(
+        'Error generating sales report',
+        error?.stack || error?.message
+      );
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to generate sales report');
     }
-
-    return Buffer.from('dummy report');
   }
 }

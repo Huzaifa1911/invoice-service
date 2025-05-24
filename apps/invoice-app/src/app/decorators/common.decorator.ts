@@ -28,6 +28,6 @@ export const RequestScope = createParamDecorator(
     const request = ctx.switchToHttp().getRequest<CustomRequestType>();
     const user = request.user;
 
-    return user.role === Role.ADMIN ? {} : { userId: user.id };
+    return user?.role === Role.ADMIN ? {} : { userId: user?.id };
   }
 );

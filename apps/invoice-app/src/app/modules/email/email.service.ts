@@ -1,13 +1,18 @@
 // src/email/email.service.ts
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
+import { ConfigService } from '@nestjs/config';
+
 import { RabbitMQService } from '../rabbitmq/rabbitmq.service';
+import { DAILY_SALES_REPORT_QUEUE } from '../../utils';
+import { ExportAttachment } from '../../types';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
   constructor(
     private readonly mailer: MailerService,
-    private readonly queueService: RabbitMQService
+    private readonly queueService: RabbitMQService,
+    private readonly configService: ConfigService
   ) {}
 
   // Simple text or HTML email
@@ -21,29 +26,45 @@ export class EmailService implements OnModuleInit {
   }
 
   // Simple text or HTML email
-  private async sendEmail(to: string, body?: string) {
+  private async sendEmail(
+    to: string,
+    body?: string,
+    attachements?: ExportAttachment[]
+  ) {
     await this.mailer.sendMail({
       to,
-      subject: 'Hello from NestJS!',
-      text: 'This is a plain-text body',
+      subject: 'Daily Sales Report',
       html: body ?? '<b>This is HTML body</b>',
+      attachments: attachements?.map((attachment) => ({
+        filename: attachment.filename,
+        content: Buffer.isBuffer(attachment.attachment)
+          ? attachment.attachment
+          : Buffer.from(attachment.attachment, 'base64'),
+      })),
     });
   }
 
-  private getEmailTemplate(report: any) {
+  private getEmailTemplate(): string {
     return `
-    <div>
-        <h1>Daily Sales Report</h1>
-        <p>Total Amount: ${report?.totalAmount}</p>
-        <p>Total Invoices: ${report?.totalItems}</p>
-        <p>Generated At: ${new Date().toLocaleString()}</p>
-      </div>`;
+    <div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
+      <h2>📊 Daily Sales Report</h2>
+      <p><strong>Report Date:</strong> ${new Date().toLocaleString()}</p>
+      <br />
+      <p>The detailed sales report is attached as a PDF document.</p>
+      <p>Regards,<br/>Sales Automation System</p>
+    </div>`;
   }
 
   onModuleInit() {
-    // Register RabbitMQ consumer for email tasks
-    this.queueService.consume('daily_sales_report', async (report) => {
-      this.sendEmail('ali.zaib@emumba.com', this.getEmailTemplate(report));
-    });
+    this.queueService.consume(
+      DAILY_SALES_REPORT_QUEUE,
+      async (report: ExportAttachment) => {
+        this.sendEmail(
+          String(this.configService.get('ADMIN_EMAIL')),
+          this.getEmailTemplate(),
+          [report]
+        );
+      }
+    );
   }
 }

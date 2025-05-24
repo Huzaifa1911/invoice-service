@@ -1,10 +1,10 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { connect } from 'amqplib';
 import type { Channel, ChannelModel } from 'amqplib';
 
 @Injectable()
-export class RabbitMQService implements OnModuleInit {
+export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   private connection!: ChannelModel;
   private channel!: Channel;
 
@@ -12,9 +12,21 @@ export class RabbitMQService implements OnModuleInit {
 
   async onModuleInit() {
     this.connection = await connect(
-      this.configService.get('RABBIT_MQ_URL') || 'amqp://localhost'
+      `${this.configService.get('RABBITMQ_URL')}:${this.configService.get(
+        'RABBITMQ_PORT'
+      )}`,
+      {}
     );
     this.channel = await this.connection.createChannel();
+  }
+
+  async onModuleDestroy() {
+    if (this.channel) {
+      await this.channel.close();
+    }
+    if (this.connection) {
+      await this.connection.close();
+    }
   }
 
   async publish(queue: string, message: any) {

@@ -80,28 +80,6 @@ export class InvoiceController {
     });
   }
 
-  @Get('/:id')
-  @Roles('ADMIN', 'USER')
-  @ApiParam({
-    name: 'id',
-    required: true,
-    description: 'Invoice ID',
-    type: String,
-    example: '1fc75fe9-3974-4e52-a920-2fae34726b51',
-  })
-  async getInvoiceById(
-    @Param('id') id: string,
-    @RequestScope() requestScope: RequestScopeType,
-    @Res() res: Response
-  ) {
-    const invoice = await this.invoiceService.getInvoiceById(id, requestScope);
-
-    res.status(200).send({
-      message: 'Invoice fetched successfully',
-      data: invoice,
-    });
-  }
-
   @Post('/')
   @Roles(Role.ADMIN, Role.USER)
   async createInvoice(
@@ -137,18 +115,49 @@ export class InvoiceController {
   })
   @Get('/report')
   async getSalesReport(
-    @RequestScope() requestScope: RequestScopeType,
     @Res() res: Response,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string
   ) {
-    const report = await this.invoiceService.generateDailyReport(
+    const exportInformation = await this.invoiceService.generateSalesReport(
       startDate,
       endDate
     );
+    if (!exportInformation) {
+      res.status(404).send('Export information not found');
+      return;
+    }
+    const { attachment, filename } = exportInformation;
+    const encodedFilename = encodeURIComponent(filename);
+
+    res.header(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodedFilename}`
+    );
+    res.header('Content-Type', 'application/pdf');
+    res.header('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.send(attachment);
+  }
+
+  @Get('/:id')
+  @Roles(Role.ADMIN, Role.USER)
+  @ApiParam({
+    name: 'id',
+    required: true,
+    description: 'Invoice ID',
+    type: String,
+    example: '1fc75fe9-3974-4e52-a920-2fae34726b51',
+  })
+  async getInvoiceById(
+    @Param('id') id: string,
+    @RequestScope() requestScope: RequestScopeType,
+    @Res() res: Response
+  ) {
+    const invoice = await this.invoiceService.getInvoiceById(id, requestScope);
+
     res.status(200).send({
-      message: 'Sales report fetched successfully',
-      data: report,
+      message: 'Invoice fetched successfully',
+      data: invoice,
     });
   }
 }

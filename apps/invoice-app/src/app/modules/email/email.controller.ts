@@ -16,6 +16,4 @@ export class EmailController {
     await this.emailService.sendTestEmail(to);
     return { message: 'Test email sent successfully' };
   }
-
-  // generate
 }

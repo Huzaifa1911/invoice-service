@@ -19,3 +19,23 @@ export type JWTDecodedPayload = {
   iat?: number;
   exp?: number;
 };
+
+export type SalesReportMeta = {
+  date: string;
+  amount: number;
+  profit: number;
+  items: SalesReportItem[];
+};
+
+export type SalesReportItem = {
+  sku: string;
+  name: string;
+  quantity: number;
+  revenue: number;
+  profit: number;
+};
+
+export type ExportAttachment = {
+  attachment: Buffer;
+  filename: string;
+};

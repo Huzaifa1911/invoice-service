@@ -127,7 +127,9 @@
     "@nestjs/schedule": "^6.0.0",
     "@prisma/client": "6.8.2",
     "amqplib": "^0.10.8",
-    "nodemailer": "^7.0.3"
+    "nodemailer": "^7.0.3",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2"
   },
   "prisma": {
     "seed": "ts-node prisma/seeds/seed.ts"
