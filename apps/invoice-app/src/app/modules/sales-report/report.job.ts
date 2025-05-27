@@ -2,22 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { InvoiceService } from '../invoices/invoice.services';
-import { RabbitMQService } from '../rabbitmq/rabbitmq.service';
 import { endOfDay, startOfDay } from 'date-fns';
+import { AppLogger } from '../../logger/logger';
 
 @Injectable()
 export class SalesReportJob {
-  constructor(
-    private readonly rabbitMQService: RabbitMQService,
-    private readonly invoiceService: InvoiceService
-  ) {}
+  private readonly logger = new AppLogger(SalesReportJob.name);
+  constructor(private readonly invoiceService: InvoiceService) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_NOON)
   async handleReport() {
-    const report = await this.invoiceService.generateSalesReport(
+    this.logger.log('Generating daily sales report...');
+    this.invoiceService.generateSalesReport(
       startOfDay(new Date()).toDateString(),
-      endOfDay(new Date()).toDateString()
+      endOfDay(new Date()).toDateString(),
+      true // set to true to publish the report to MQ
     );
-    await this.rabbitMQService.publish('daily_sales_report', report);
   }
 }

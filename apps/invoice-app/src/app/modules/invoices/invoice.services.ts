@@ -21,6 +21,7 @@ import {
   SalesReportItem,
   SalesReportMeta,
 } from '../../types';
+import { RabbitMQService } from '../rabbitmq/rabbitmq.service';
 
 @Injectable()
 /**
@@ -30,7 +31,10 @@ import {
 export class InvoiceService {
   private readonly logger = new AppLogger(InvoiceService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rabbitMQService: RabbitMQService
+  ) {}
 
   /**
    * Retrieves a paginated and optionally filtered list of invoices.
@@ -220,8 +224,9 @@ export class InvoiceService {
    */
   async generateSalesReport(
     startDate?: string,
-    endDate?: string
-  ): Promise<ExportAttachment> {
+    endDate?: string,
+    shouldPublishToMQ = false
+  ): Promise<ExportAttachment | null> {
     try {
       this.logger.log(
         `Generating sales report from ${startDate} to ${endDate}`
@@ -298,6 +303,16 @@ export class InvoiceService {
 
       // Generate and return the PDF buffer
       const attachment = await generateSalesReportPDF(report);
+      const exportInformation = {
+        attachment,
+        filename: sanitizeSalesReportFileName(whereClause),
+      };
+
+      if (shouldPublishToMQ) {
+        this.logger.log('Publishing sales report to Message Queue');
+        this.rabbitMQService.publish('daily_sales_report', exportInformation);
+        return null;
+      }
 
       return {
         attachment,
