@@ -13,9 +13,17 @@ export default {
   displayName: 'invoice-app',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  collectCoverage: true,
+  testTimeout: 70000,
+  coverageReporters: ['html', 'lcov', 'text', 'text-summary'],
+  collectCoverageFrom: ['src/**/*.{js,jsx,ts,tsx}', '!src/**/*.d.ts'],
   transform: {
-    '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig]
+    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: 'test-output/jest/coverage'
+  coverageDirectory: '../../coverage/apps/eva-bff',
+  testMatch: [
+    '<rootDir>/src/**/__tests__/**/*.[jt]s?(x)',
+    '<rootDir>/src/**/*(*.)@(spec|test).[jt]s?(x)',
+  ],
 };
