@@ -197,18 +197,14 @@ export class InvoiceService {
       });
 
       // 4. Update stock using updateMany (if supported per itemId)
-      await Promise.all(
-        items.map(({ itemId, quantity }) =>
-          tx.item.update({
-            where: { id: itemId },
-            data: {
-              quantity: {
-                decrement: quantity,
-              },
-            },
-          })
-        )
-      );
+      await tx.item.updateMany({
+        where: { id: { in: itemIds } },
+        data: {
+          quantity: {
+            decrement: items.reduce((acc, item) => acc + item.quantity, 0),
+          },
+        },
+      });
 
       return invoice;
     });
