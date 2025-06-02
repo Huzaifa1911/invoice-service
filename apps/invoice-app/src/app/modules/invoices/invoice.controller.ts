@@ -9,9 +9,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 
-import { InvoiceService } from './invoice.services';
+import { InvoiceService } from './invoice.service';
 import { CreateInvoiceDto } from './dtos/create-invoice.dto';
 import {
   Roles,
@@ -24,6 +24,7 @@ import type { RequestScopeType } from '../../types';
 import { RolesGuard } from '../../guards/roles.guard';
 import { Role } from '../../../../generated/prisma';
 
+@ApiBearerAuth('access_token')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('invoices')
 export class InvoiceController {

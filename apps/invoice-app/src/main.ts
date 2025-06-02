@@ -28,7 +28,15 @@ async function bootstrap() {
     .setTitle('Invoice App API')
     .setDescription('Invoice App API description')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+      },
+      'access_token'
+    )
     .build();
   const document = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup(`${GLOBAL_PREFIX}/docs`, app, document);

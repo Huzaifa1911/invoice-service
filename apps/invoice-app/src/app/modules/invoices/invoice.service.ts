@@ -150,68 +150,79 @@ export class InvoiceService {
   ): Promise<Invoice> {
     const { customer, items } = payload;
 
-    return await this.prisma.$transaction(async (tx) => {
-      // 1. Validate items and stock
-      const itemIds = items.map((i) => i.itemId);
-      const dbItems = await tx.item.findMany({
-        where: { id: { in: itemIds } },
-      });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Validate items and stock
+        const itemIds = items.map((i) => i.itemId);
+        const dbItems = await tx.item.findMany({
+          where: { id: { in: itemIds } },
+        });
 
-      const itemMap = new Map(dbItems.map((item) => [item.id, item]));
-      let totalAmount = 0;
+        const itemMap = new Map(dbItems.map((item) => [item.id, item]));
+        let totalAmount = 0;
 
-      for (const { itemId, quantity } of items) {
-        const dbItem = itemMap.get(itemId);
-        if (!dbItem) {
-          throw new BadRequestException(`Item ID ${itemId} not found`);
+        for (const { itemId, quantity } of items) {
+          const dbItem = itemMap.get(itemId);
+          if (!dbItem) {
+            throw new BadRequestException(`Item ID ${itemId} not found`);
+          }
+          if ((dbItem.quantity ?? 0) < quantity) {
+            throw new BadRequestException(
+              `Insufficient stock for item '${dbItem.name}'. Requested: ${quantity}, Available: ${dbItem.quantity}`
+            );
+          }
+
+          totalAmount += (dbItem.sale_price ?? 0) * quantity;
         }
-        if ((dbItem.quantity ?? 0) < quantity) {
-          throw new BadRequestException(
-            `Insufficient stock for item '${dbItem.name}'. Requested: ${quantity}, Available: ${dbItem.quantity}`
-          );
-        }
 
-        totalAmount += (dbItem.sale_price ?? 0) * quantity;
-      }
+        // 2. Generate unique reference
+        const now = new Date();
+        const monthStr = `${now.getFullYear()}${(now.getMonth() + 1)
+          .toString()
+          .padStart(2, '0')}`;
+        const invoiceCount = await tx.invoice.count();
+        const reference = `INV-${monthStr}-${(invoiceCount + 1)
+          .toString()
+          .padStart(4, '0')}`;
 
-      // 2. Generate unique reference
-      const now = new Date();
-      const monthStr = `${now.getFullYear()}${(now.getMonth() + 1)
-        .toString()
-        .padStart(2, '0')}`;
-      const invoiceCount = await tx.invoice.count();
-      const reference = `INV-${monthStr}-${(invoiceCount + 1)
-        .toString()
-        .padStart(4, '0')}`;
-
-      // 3. Create invoice
-      const invoice = await tx.invoice.create({
-        data: {
-          customer,
-          reference,
-          amount: Math.round(totalAmount * 100) / 100,
-          date: now,
-          userId,
-          items: {
-            createMany: {
-              data: items.map(({ itemId, quantity }) => ({ itemId, quantity })),
+        // 3. Create invoice
+        const invoice = await tx.invoice.create({
+          data: {
+            customer,
+            reference,
+            amount: Math.round(totalAmount * 100) / 100,
+            date: now,
+            userId,
+            items: {
+              createMany: {
+                data: items.map(({ itemId, quantity }) => ({
+                  itemId,
+                  quantity,
+                })),
+              },
             },
           },
-        },
-      });
+        });
 
-      // 4. Update stock using updateMany (if supported per itemId)
-      await tx.item.updateMany({
-        where: { id: { in: itemIds } },
-        data: {
-          quantity: {
-            decrement: items.reduce((acc, item) => acc + item.quantity, 0),
+        // 4. Update stock using updateMany (if supported per itemId)
+        await tx.item.updateMany({
+          where: { id: { in: itemIds } },
+          data: {
+            quantity: {
+              decrement: items.reduce((acc, item) => acc + item.quantity, 0),
+            },
           },
-        },
-      });
+        });
 
-      return invoice;
-    });
+        return invoice;
+      });
+    } catch (error) {
+      this.logger.error('Error creating invoice. Details:', error as any);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to create invoice');
+    }
   }
 
   /**

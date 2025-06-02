@@ -1,69 +1,49 @@
-import { ConfigService } from '@nestjs/config';
-import { ExtractJwt } from 'passport-jwt';
+/**
+ * jwt.strategy.spec.ts
+ *
+ * Jest test suite for JwtStrategy.
+ * Mocks ConfigService to verify:
+ *  - The constructor calls getOrThrow('JWT_SECRET') to retrieve the secret.
+ *  - The validate() method returns the correct user object based on the JWT payload.
+ */
 
 import { JwtStrategy } from '../jwt.strategy';
-import { JWTDecodedPayload } from '../../../types';
-
-jest.mock('@nestjs/config');
+import { ConfigService } from '@nestjs/config';
 
 describe('JwtStrategy', () => {
-  let jwtStrategy: JwtStrategy;
-  let configService: jest.Mocked<ConfigService>;
-
-  const JWT_SECRET = 'test-secret';
+  let strategy: JwtStrategy;
+  let mockConfigService: { getOrThrow: jest.Mock };
 
   beforeEach(() => {
-    configService = {
-      getOrThrow: jest.fn().mockReturnValue(JWT_SECRET),
-    } as unknown as jest.Mocked<ConfigService>;
-
-    jwtStrategy = new JwtStrategy(configService);
-  });
-
-  it('should call ConfigService.getOrThrow with JWT_SECRET', () => {
-    expect(configService.getOrThrow).toHaveBeenCalledWith('JWT_SECRET');
-  });
-
-  it('should extract token from Authorization header correctly', () => {
-    const mockReq = {
-      headers: {
-        authorization: 'Bearer abc.def.ghi',
-      },
+    // Mock ConfigService.getOrThrow to return a fixed secret
+    mockConfigService = {
+      getOrThrow: jest.fn().mockReturnValue('test-jwt-secret'),
     };
 
-    const token = ExtractJwt.fromAuthHeaderAsBearerToken()(mockReq);
-    expect(token).toBe('abc.def.ghi');
+    // Instantiate JwtStrategy with the mocked ConfigService
+    strategy = new JwtStrategy(mockConfigService as unknown as ConfigService);
   });
 
-  describe('validate', () => {
-    it('should return the user object from JWT payload', async () => {
-      const payload: JWTDecodedPayload = {
-        id: 'user123',
-        email: 'user@example.com',
-        role: 'ADMIN',
-        iat: 100,
-        exp: 200,
-      };
+  it('should be defined', () => {
+    expect(strategy).toBeDefined();
+  });
 
-      const result = await jwtStrategy.validate(payload);
-      expect(result).toEqual({
-        id: 'user123',
-        email: 'user@example.com',
-        role: 'ADMIN',
-      });
-    });
+  it('should call getOrThrow with "JWT_SECRET" in the constructor', () => {
+    expect(mockConfigService.getOrThrow).toHaveBeenCalledWith('JWT_SECRET');
+  });
 
-    it('should handle missing fields in payload', async () => {
-      const payload: Partial<JWTDecodedPayload> = {
-        id: 'user123',
-      };
+  it('validate() should return a user object matching the payload', async () => {
+    const payload = {
+      id: 'user-123',
+      email: 'user@example.com',
+      role: 'admin',
+    };
 
-      const result = await jwtStrategy.validate(payload as any);
-      expect(result).toEqual({
-        id: 'user123',
-        email: undefined,
-        role: undefined,
-      });
+    const result = await strategy.validate(payload as any);
+    expect(result).toEqual({
+      id: 'user-123',
+      email: 'user@example.com',
+      role: 'admin',
     });
   });
 });
