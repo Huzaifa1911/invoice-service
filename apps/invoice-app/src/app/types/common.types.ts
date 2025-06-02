@@ -33,6 +33,8 @@ export type SalesReportItem = {
   quantity: number;
   revenue: number;
   profit: number;
+  unitPrice?: number;
+  salePrice?: number;
 };
 
 export type ExportAttachment = {

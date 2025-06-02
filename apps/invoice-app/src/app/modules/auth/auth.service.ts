@@ -48,7 +48,7 @@ export class AuthService {
     };
   }
 
-  async register({ email, password, full_name, role = 'USER' }: signupDTO) {
+  async register({ email, password, full_name }: signupDTO) {
     const user = await this.prismaService.user.findUnique({
       where: { email },
     });
@@ -62,7 +62,6 @@ export class AuthService {
           email,
           password: hashedPassword,
           full_name,
-          role,
         },
       });
 

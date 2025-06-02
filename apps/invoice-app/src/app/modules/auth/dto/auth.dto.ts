@@ -1,13 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
-import { Role } from '../../../../../generated/prisma';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginDTO {
   @IsEmail()
@@ -39,16 +31,17 @@ export class signupDTO {
   @ApiProperty()
   password!: string;
 
-  @IsOptional()
-  @IsEnum(Role, {
-    message: `Role must be one of: ${Object.values(Role).join(', ')}`,
-  })
-  @ApiPropertyOptional({
-    enum: Role,
-    description: 'Optional role assignment (USER or ADMIN)',
-  })
+  // @IsOptional()
+  // @IsEnum(Role, {
+  //   message: `Role must be one of: ${Object.values(Role).join(', ')}`,
+  // })
+  // @ApiPropertyOptional({
+  //   enum: Role,
+  //   description: 'Optional role assignment (USER or ADMIN)',
+  // })
+
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
-  @ApiPropertyOptional({ enum: Role, default: Role.USER })
-  role?: Role;
+  // @ApiPropertyOptional({ enum: Role, default: Role.USER })
+  // role?: Role;
 }

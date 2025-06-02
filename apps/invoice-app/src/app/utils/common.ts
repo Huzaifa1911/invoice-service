@@ -33,12 +33,24 @@ export async function generateSalesReportPDF(
   // Table Section
   autoTable(doc, {
     startY: summaryY + 30,
-    head: [['SKU', 'Name', 'Qty', 'Revenue ($)', 'Profit ($)']],
+    head: [
+      [
+        'SKU',
+        'Name',
+        'Qty',
+        'Total Sales ($)',
+        'Unit Price',
+        'Sale Price',
+        'Profit ($)',
+      ],
+    ],
     body: report.items.map((item) => [
       item.sku,
       item.name,
       item.quantity.toString(),
       item.revenue.toFixed(2),
+      item.unitPrice?.toFixed(2) ?? 0,
+      item.salePrice?.toFixed(2) ?? 0,
       item.profit.toFixed(2),
     ]),
     styles: { fontSize: 10, halign: 'center' },
