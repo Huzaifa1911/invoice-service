@@ -81,13 +81,14 @@ export class InvoiceService {
         this.prisma.invoice.count({ where: whereClause }),
       ]);
 
+      const nextPage = page * limit < total ? Number(page + 1) : null;
       return {
         data: invoices,
         meta: {
           total,
-          limit,
-          currentPage: page,
-          nextPage: page * limit < total ? page + 1 : null,
+          limit: Number(limit),
+          currentPage: Number(page),
+          nextPage: nextPage,
           totalPages: Math.ceil(total / limit),
         },
       };
